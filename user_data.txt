@@ -1,0 +1,9 @@
+usr_date_start: 2024-12-17
+usr_date_start_time: 09:00
+usr_loc_start_lon: 49.09
+usr_loc_start_lat: 8.07
+usr_loc_start_height: 223
+usr_float_alt: 8500
+usr_ascent: 0.4
+usr_date_end: 2024-12-20
+usr_date_end_time: 09:00
