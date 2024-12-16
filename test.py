@@ -1,7 +1,7 @@
 
 #!/usr/bin/env python
 #
-#   prediction with day and night markers
+#   prediction with day and night markers  v0.2
 #
 import urllib.request
 import requests
