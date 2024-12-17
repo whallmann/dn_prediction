@@ -8,6 +8,7 @@ import requests
 import csv
 import numpy as np
 import simplekml
+import ftplib
 from datetime import datetime
 from astral import Observer
 from astral.sun import elevation
@@ -17,6 +18,7 @@ class Constants:
    # org   source_url = "https://api.v2.sondehub.org/tawhiri?profile=float_profile&launch_datetime=2024-12-17T08:50Z&stop_datetime=2024-12-20T08:50Z&launch_latitude=49.885&launch_longitude=8.0735&launch_altitude=223&ascent_rate=0.4&float_altitude=8500&format=csv"
    source_url = "https://api.v2.sondehub.org/tawhiri?profile=float_profile&launch_datetime=@@usr_date_start@@T@@usr_date_start_time@@:00Z&stop_datetime=@@usr_date_end@@T@@usr_date_end_time@@:00Z&launch_latitude=@@usr_loc_start_lon@@&launch_longitude=@@usr_loc_start_lat@@&launch_altitude=@@usr_loc_start_height@@&ascent_rate=@@usr_ascent@@&float_altitude=@@usr_float_alt@@&format=csv"
    local_filename = "test.csv"
+   KMLfilename = "test.kml"
 
 # --------------------------------------------------
 
@@ -146,9 +148,9 @@ def create_kml_line(datetime_data, latitude_data, longitude_data, altitude_data,
     linestring.style.linestyle.color = simplekml.Color.blue
 
     # Speichere die KML-Datei
-    kml.save("test.kml")
+    kml.save(Constants.KMLfilename)
 
-    print("KML-Datei 'test.kml' wurde erfolgreich erstellt.")
+    print(f"KML-Datei '{Constants.KMLfilename}' wurde erfolgreich erstellt.")
 
 
 # --------------------------------------------------
@@ -273,6 +275,22 @@ def mainprogram():
        # Beispielaufruf
        sun_elevation = get_sun_elevation(datetime_data[0], latitude_data[0],  longitude_data[0])
        print(f"Sonnenhöhe am {datetime_data[0]}: {sun_elevation:.2f}°")
+       # FTP upload to private server
+       ftp_upload_kml(Constants.KMLfilename);
+
+# --------------------------------------------------
+
+def ftp_upload_kml(filename):
+   # FTP-Verbindung herstellen
+   print("FTP Upload starten")
+   ftp = ftplib.FTP("webserver_url.com")
+   ftp.login("username", "password")
+   # Datei öffnen und hochladen
+   with open(filename, "rb") as file:
+       ftp.storbinary(f"STOR {filename}", file)
+   # Verbindung schließen
+   ftp.quit()
+   print("FTP abgeschlossen")
 
 # --------------------------------------------------
 
