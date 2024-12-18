@@ -1,7 +1,10 @@
 
 #!/usr/bin/env python
 #
-#   prediction with day and night markers  v0.2
+#   prediction with day and night markers  v0.3
+#
+#   2024-12-18:  added ftp upload to a server where browser can load kml.file with open to any app who can use KML files
+#                added start parameter /c - inputs coordinates of last end-prediction point as new start point. Run once without /c first
 #
 import urllib.request
 import requests
@@ -9,6 +12,8 @@ import csv
 import numpy as np
 import simplekml
 import ftplib
+import sys
+
 from datetime import datetime
 from astral import Observer
 from astral.sun import elevation
@@ -16,7 +21,7 @@ from astral.sun import elevation
 
 class Constants:
    # org   source_url = "https://api.v2.sondehub.org/tawhiri?profile=float_profile&launch_datetime=2024-12-17T08:50Z&stop_datetime=2024-12-20T08:50Z&launch_latitude=49.885&launch_longitude=8.0735&launch_altitude=223&ascent_rate=0.4&float_altitude=8500&format=csv"
-   source_url = "https://api.v2.sondehub.org/tawhiri?profile=float_profile&launch_datetime=@@usr_date_start@@T@@usr_date_start_time@@:00Z&stop_datetime=@@usr_date_end@@T@@usr_date_end_time@@:00Z&launch_latitude=@@usr_loc_start_lon@@&launch_longitude=@@usr_loc_start_lat@@&launch_altitude=@@usr_loc_start_height@@&ascent_rate=@@usr_ascent@@&float_altitude=@@usr_float_alt@@&format=csv"
+   source_url = "https://api.v2.sondehub.org/tawhiri?profile=float_profile&launch_datetime=@@usr_date_start@@T@@usr_date_start_time@@:00Z&stop_datetime=@@usr_date_end@@T@@usr_date_end_time@@:00Z&launch_latitude=@@usr_loc_start_lat@@&launch_longitude=@@usr_loc_start_lon@@&launch_altitude=@@usr_loc_start_height@@&ascent_rate=@@usr_ascent@@&float_altitude=@@usr_float_alt@@&format=csv"
    local_filename = "test.csv"
    KMLfilename = "test.kml"
 
@@ -100,17 +105,17 @@ def create_kml_line(datetime_data, latitude_data, longitude_data, altitude_data,
         coordinates.append((lon, lat, alt))
         if i > 0:
             sun_altitude = sun_elevation = get_sun_elevation(datetime_data[i], latitude_data[i],  longitude_data[i])
-            if last_sun_altitude < 0 and sun_altitude >=0: 
+            if last_sun_altitude < 5 and sun_altitude >=5: 
                # Einen neuen Punkt (Marker) hinzufügen
-               pnt = kml.newpoint(name="SunSet", description=f"Sunset at {datetime_data[i]}", coords=[(lon, lat, alt)])
+               pnt = kml.newpoint(name="SunSet", description=f"Sunset 5° at {datetime_data[i]}", coords=[(lon, lat, alt)])
                # Optionale Anpassungen
                pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/sunny.png'
                pnt.style.iconstyle.scale = 1.2
                pnt.style.labelstyle.color = simplekml.Color.red
 
-            if last_sun_altitude >= 0 and sun_altitude <0: 
+            if last_sun_altitude >= 5 and sun_altitude <5: 
                # Einen neuen Punkt (Marker) hinzufügen
-               pnt = kml.newpoint(name="Night", description=f"Sundown at {datetime_data[i]}", coords=[(lon, lat, alt)])
+               pnt = kml.newpoint(name="Night", description=f"Sundown 5° at {datetime_data[i]}", coords=[(lon, lat, alt)])
                # Optionale Anpassungen
                pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/paddle/orange-stars.png'
                pnt.style.iconstyle.scale = 1.2
@@ -119,9 +124,12 @@ def create_kml_line(datetime_data, latitude_data, longitude_data, altitude_data,
             last_sun_altitude = sun_altitude
         if i == 0:
             # Einen neuen Punkt (Marker) hinzufügen
-            pnt = kml.newpoint(name="Startplatz", description=f"{datetime_data[i]}\nSun angle: {last_sun_altitude}", coords=[(lon, lat, alt)])
+            pnt = kml.newpoint(name="Start/Continue", description=f"{datetime_data[i]}\nSun angle: {last_sun_altitude}", coords=[(lon, lat, alt)])
             # Optionale Anpassungen
-            pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png'
+            if alt > 1000:
+               pnt.style.iconstyle.icon.href = 'http://earth.google.com/images/kml-icons/track-directional/track-none.png'
+            else:
+               pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png'
             pnt.style.iconstyle.scale = 1.2
             pnt.style.labelstyle.color = simplekml.Color.yellow
         elif i == change_index:
@@ -165,6 +173,15 @@ def mainprogram():
     print("=========================================================")
     print("Create KML file with sun markers based on prediction path")
     print("=========================================================")
+    # Parameter /c übergeben?
+    prediction_continue = False
+    if "/c" in sys.argv:
+       print("Der Parameter /c wurde übergeben")
+       # Hier können Sie die gewünschte Aktion für /c ausführen
+    else:
+       print("Der Parameter /c wurde nicht übergeben")
+    prediction_continue =  "/c" in sys.argv
+
     # check if user input saved before
     saved_data = {}
     try:
@@ -194,17 +211,40 @@ def mainprogram():
     if usr_date_start_time=='':
        usr_date_start_time=saved_data.get('usr_date_start_time', '')
 
-    usr_loc_start_lon=input(f"Location start in decimal [logtitude] [{saved_data.get('usr_loc_start_lon', '')}]: ")
-    if usr_loc_start_lon=='':
-       usr_loc_start_lon=saved_data.get('usr_loc_start_lon', '')
+    if prediction_continue:
+      usr_loc_start_lon=input(f"Location start in decimal [longtitude] [{saved_data.get('usr_loc_end_lon', '')}]: ")
+      if usr_loc_start_lon=='':
+         usr_loc_start_lon=saved_data.get('usr_loc_end_lon', '')
+         if float(usr_loc_end_lon) < 0:
+            usr_loc_end_lon=str(float(usr_loc_end_lon)+360)
+    else:
+      usr_loc_start_lon=input(f"Location start in decimal [longtitude] [{saved_data.get('usr_loc_start_lon', '')}]: ")
+      if usr_loc_start_lon=='':
+         usr_loc_start_lon=saved_data.get('usr_loc_start_lon', '')
+         if float(usr_loc_start_lon) < 0:
+            usr_loc_start_lon=str(float(usr_loc_start_lon)+360)
 
-    usr_loc_start_lat=input(f"Location start in decimal [latitude] [{saved_data.get('usr_loc_start_lat', '')}]: ")
-    if usr_loc_start_lat=='':
-       usr_loc_start_lat=saved_data.get('usr_loc_start_lat', '')
+    if prediction_continue:
+      usr_loc_start_lat=input(f"Location start in decimal [latitude] [{saved_data.get('usr_loc_end_lat', '')}]: ")
+      if usr_loc_start_lat=='':
+         usr_loc_start_lat=saved_data.get('usr_loc_end_lat', '')
+         if float(usr_loc_end_lat) < 0:
+            usr_loc_end_lat=str(float(usr_loc_end_lat)+180)
+    else:
+      usr_loc_start_lat=input(f"Location start in decimal [latitude] [{saved_data.get('usr_loc_start_lat', '')}]: ")
+      if usr_loc_start_lat=='':
+         usr_loc_start_lat=saved_data.get('usr_loc_start_lat', '')
+         if float(usr_loc_start_lat) < 0:
+            usr_loc_start_lat=str(float(usr_loc_start_lat)+180)
 
-    usr_loc_start_height=input(f"Height of start location in meters [{saved_data.get('usr_loc_start_height', '')}]: ")
-    if usr_loc_start_height=='':
-       usr_loc_start_height=saved_data.get('usr_loc_start_height', '')
+    if prediction_continue:
+       usr_loc_start_height=input(f"Height of start location in meters [{saved_data.get('usr_float_alt', '')}]: ")
+       if usr_loc_start_height=='':
+          usr_loc_start_height = str(int(saved_data.get('usr_float_alt', '0')) - 1)
+    else:
+       usr_loc_start_height=input(f"Height of start location in meters [{saved_data.get('usr_loc_start_height', '')}]: ")
+       if usr_loc_start_height=='':
+          usr_loc_start_height=saved_data.get('usr_loc_start_height', '')
 
     usr_float_alt=input(f"Float altitude in meters [{saved_data.get('usr_float_alt', '')}]: ")
     if usr_float_alt=='':
@@ -272,6 +312,12 @@ def mainprogram():
        else:
          print("Kein Übergang gefunden.")
        create_kml_line(datetime_data, latitude_data, longitude_data, altitude_data, index)
+       usr_loc_end_lat = latitude_data[len(latitude_data)-1]
+       usr_loc_end_lon = longitude_data[len(longitude_data)-1]
+       # Letzte Position anhängen
+       with open("user_data.txt", "a") as file:
+         file.write(f"usr_loc_end_lon: {usr_loc_end_lon}\n")
+         file.write(f"usr_loc_end_lat: {usr_loc_end_lat}\n")
        # Beispielaufruf
        sun_elevation = get_sun_elevation(datetime_data[0], latitude_data[0],  longitude_data[0])
        print(f"Sonnenhöhe am {datetime_data[0]}: {sun_elevation:.2f}°")
@@ -283,8 +329,8 @@ def mainprogram():
 def ftp_upload_kml(filename):
    # FTP-Verbindung herstellen
    print("FTP Upload starten")
-   ftp = ftplib.FTP("webserver_url.com")
-   ftp.login("username", "password")
+   ftp = ftplib.FTP("serverip")
+   ftp.login("username", "pw")
    # Datei öffnen und hochladen
    with open(filename, "rb") as file:
        ftp.storbinary(f"STOR {filename}", file)
