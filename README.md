@@ -17,6 +17,11 @@ Then enrich the Datapoints in the output for START, FLOATLEVEL, SUNSET and SUNDO
 
 ![Google-Earth Hardcopy](https://github.com/whallmann/dn_prediction/blob/main/pictures/photo_2024-12-16_18-10-16.jpg)
 
+## Change log
+- Param /c inputs from last prediction endpoint the coordinats as new start point if you do not enter new coordinates
+- FTP Upload possible: remark line ftp_upload if not nessesery. Otherwise fill out the destination, user and pw for an upload. This ist good for fast access by Browser Link and fast open a App to show the flight path visually
+
+
 ## Installation
 - you need a virtual environment .venv (help is for unix)
   - cd /path/to/ur/project
